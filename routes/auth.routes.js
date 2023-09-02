@@ -10,14 +10,15 @@ router.get("/signup", isLoggedOut,(req, res) => {
 });
 
 router.post("/signup", isLoggedOut,(req, res, next) => {
-  //const regex = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,}/;
-  // if (!regex.test(password)) {
-  //   res
-  //     .status(500)
-  //     .render('auth/signup', { errorMessage: 'Password needs to have at least 6 chars and must contain at least one number, one lowercase and one uppercase letter.' });
-  //   return;
-  // }
+ 
   const { username, email, password } = req.body;
+  const regex = /(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{6,}/;
+  if (!regex.test(password)) {
+    res
+      .status(500)
+      .render('auth/signup', { errorMessage: 'Password needs to have at least 6 chars and must contain at least one number, one lowercase and one uppercase letter.' });
+    return;
+  }
   // make sure users fill all mandatory fields:
   if (!username || !email || !password) {
     res.render("auth/signup", {
@@ -43,9 +44,17 @@ router.post("/signup", isLoggedOut,(req, res, next) => {
     .catch((error) => {
       if (error instanceof mongoose.Error.ValidationError) {
         res.status(500).render('auth/signup', { errorMessage: error.message });
-    } else {
+      } else if (error.code === 11000) {
+ 
+        //console.log(" ");
+ 
+        res.status(500).render('auth/signup', {
+          // errorMessage: 'User not found and/or incorrect password.'
+          errorMessage: "Username and email need to be unique. Either username or email is already used. "
+        });
+      } else {
         next(error);
-    }
+      }
   }) 
 });
 //////////// L O G I N ///////////
@@ -54,7 +63,7 @@ router.post("/signup", isLoggedOut,(req, res, next) => {
 router.get('/login',isLoggedOut, (req, res) => res.render('auth/login'));
 // POST login route ==> to process form data
 router.post('/login',isLoggedOut, (req, res, next) => {
-  console.log('SESSION =====> ', req.session);
+ // console.log('SESSION =====> ', req.session);
   const { email, password } = req.body;
  
  
@@ -67,14 +76,17 @@ router.post('/login',isLoggedOut, (req, res, next) => {
  
   User.findOne({ email })
     .then(user => {
+     
       if (!user) {
+      
         console.log("Email not registered. ");
         res.render('auth/login', { errorMessage: 'User not found and/or incorrect password.' });
         return;
       } else if (bcryptjs.compareSync(password, user.passwordHash)) {
         // res.render('users/user-profile', { user });
-
-       res.session.currentUser = user
+      
+       req.session.currentUser = user
+       console.log(res.session)
        res.redirect('/userProfile')
 
       } else {
@@ -95,4 +107,15 @@ router.post('/logout', isLoggedIn, (req, res) => {
     res.redirect('/');
   });
 });
+
+///////main page//////
+
+router.get('/main', isLoggedIn, (req, res) => {
+  res.render('main', { userInSession: req.session.currentUser });
+});
+
+router.get('/private', isLoggedIn, (req, res) => {
+  res.render('private', { userInSession: req.session.currentUser });
+});
+
 module.exports = router;
